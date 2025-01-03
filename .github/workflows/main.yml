@@ -16,31 +16,43 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '14'
+          node-version: '16'
 
       - name: Install dependencies
         run: |
-          npm install marked jszip
+          npm init -y
+          npm install markdown-it jszip
 
-      - name: Convert Markdown to HTML
+      - name: Create conversion script
         run: |
-          npx marked -o news.html news.md
-          npx marked -o changelog.html changelog.md
+          cat > convert.js << 'EOF'
+          const fs = require('fs');
+          const MarkdownIt = require('markdown-it');
+          const JSZip = require('jszip');
+          const md = new MarkdownIt();
 
-      - name: Create JSON file
-        run: |
-          echo '{ "news": "' > release.json
-          cat news.html | sed 's/"/\\"/g' >> release.json
-          echo '", "changelog": "' >> release.json
-          cat changelog.html | sed 's/"/\\"/g' >> release.json
-          echo '" }' >> release.json
+          const news = md.render(fs.readFileSync('news.md', 'utf8'));
+          const changelog = md.render(fs.readFileSync('changelog.md', 'utf8'));
 
-      - name: Create ZIP archive
-        run: |
-          zip release.zip release.json
+          const data = {
+            news: news,
+            changelog: changelog
+          };
 
-      - name: Upload ZIP artifact
-        uses: actions/upload-artifact@v3
+          fs.writeFileSync('release.json', JSON.stringify(data));
+
+          const zip = new JSZip();
+          zip.file('release.json', fs.readFileSync('release.json'));
+          zip.generateNodeStream({ type: 'nodebuffer', streamFiles: true })
+            .pipe(fs.createWriteStream('release.zip'));
+          EOF
+
+      - name: Convert and package files
+        run: node convert.js
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
         with:
-          name: release-zip
-          path: release.zip
+          files: release.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
