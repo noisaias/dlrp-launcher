@@ -35,20 +35,31 @@ jobs:
           const JSZip = require('jszip');
           const md = new MarkdownIt();
 
-          const news = md.render(fs.readFileSync('news.md', 'utf8'));
-          const changelog = md.render(fs.readFileSync('changelog.md', 'utf8'));
+          // Read files
+          const news = md.render(fs.readFileSync('news.md', 'utf8')).replace(/\n/g, '');
+          const changelog = md.render(fs.readFileSync('changelog.md', 'utf8')).replace(/\n/g, '');
+          const server = fs.readFileSync('server_direction.txt', 'utf8').trim();
 
           const data = {
             news: news,
-            changelog: changelog
+            changelog: changelog,
+            server: server
           };
 
-          fs.writeFileSync('release.json', JSON.stringify(data));
+          // Create JSON
+          fs.writeFileSync('release.json', JSON.stringify(data, null, 2));
 
-          const zip = new JSZip();
-          zip.file('release.json', fs.readFileSync('release.json'));
-          zip.generateNodeStream({ type: 'nodebuffer', streamFiles: true })
-            .pipe(fs.createWriteStream('release.zip'));
+          // Create ZIP with promise handling
+          async function createZip() {
+            const zip = new JSZip();
+            zip.file('release.json', fs.readFileSync('release.json'));
+            await zip.generateAsync({type: 'nodebuffer'})
+              .then(content => {
+                fs.writeFileSync('release.zip', content);
+              });
+          }
+
+          createZip();
           EOF
 
       - name: Convert and package files
