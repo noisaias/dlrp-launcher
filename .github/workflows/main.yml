@@ -11,10 +11,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Set up Node.js
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
           node-version: '14'
 
@@ -24,21 +24,23 @@ jobs:
 
       - name: Convert Markdown to HTML
         run: |
-          node -e "
-          const fs = require('fs');
-          const marked = require('marked');
-          const news = marked(fs.readFileSync('news.md', 'utf8'));
-          const changelog = marked(fs.readFileSync('changelog.md', 'utf8'));
-          const jsonData = JSON.stringify({ news, changelog });
-          fs.writeFileSync('output.json', jsonData);
-          "
+          npx marked -o news.html news.md
+          npx marked -o changelog.html changelog.md
+
+      - name: Create JSON file
+        run: |
+          echo '{ "news": "' > release.json
+          cat news.html | sed 's/"/\\"/g' >> release.json
+          echo '", "changelog": "' >> release.json
+          cat changelog.html | sed 's/"/\\"/g' >> release.json
+          echo '" }' >> release.json
 
       - name: Create ZIP archive
         run: |
-          zip output.zip output.json
+          zip release.zip release.json
 
-      - name: Upload ZIP for release
-        uses: actions/upload-artifact@v2
+      - name: Upload ZIP artifact
+        uses: actions/upload-artifact@v3
         with:
-          name: release-package
-          path: output.zip
+          name: release-zip
+          path: release.zip
