@@ -1,0 +1,44 @@
+name: Convert and Package
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  convert_and_package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+
+      - name: Install dependencies
+        run: |
+          npm install marked jszip
+
+      - name: Convert Markdown to HTML
+        run: |
+          node -e "
+          const fs = require('fs');
+          const marked = require('marked');
+          const news = marked(fs.readFileSync('news.md', 'utf8'));
+          const changelog = marked(fs.readFileSync('changelog.md', 'utf8'));
+          const jsonData = JSON.stringify({ news, changelog });
+          fs.writeFileSync('output.json', jsonData);
+          "
+
+      - name: Create ZIP archive
+        run: |
+          zip output.zip output.json
+
+      - name: Upload ZIP for release
+        uses: actions/upload-artifact@v2
+        with:
+          name: release-package
+          path: output.zip
